@@ -3,13 +3,14 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const axios = require('axios'); // ✅ এই লাইব্রেরি HTTP রিকোয়েস্ট পাঠাতে দরকার
 
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static('public')); // Frontend files will be served from here
+app.use(express.static('public'));
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/paymentDB', {
@@ -23,7 +24,7 @@ db.once('open', () => {
     console.log('Connected to MongoDB');
 });
 
-// Payment Model
+// Payment Schema
 const paymentSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true },
@@ -35,28 +36,28 @@ const paymentSchema = new mongoose.Schema({
 
 const Payment = mongoose.model('Payment', paymentSchema);
 
-// API Routes
+// ✅ Webhook URL (তুমি .env ফাইলে রাখতে পারো)
+const WEBHOOK_URL = process.env.WEBHOOK_URL || 'https://example.com/webhook';
+
+// API Route
 app.post('/api/submit-payment', async (req, res) => {
     try {
         const { name, email, mobile, transactionId, paymentMethod } = req.body;
-        
-        // Validate data
+
+        // Validation
         if (!name || !email || !mobile || !transactionId || !paymentMethod) {
             return res.status(400).json({ message: 'সমস্ত তথ্য প্রদান করুন' });
         }
-        
-        // Check if mobile number is valid (11 digits for Bangladesh)
+
         if (!/^01[3-9]\d{8}$/.test(mobile)) {
             return res.status(400).json({ message: 'সঠিক মোবাইল নম্বর দিন' });
         }
-        
-        // Check if transaction ID already exists
+
         const existingTransaction = await Payment.findOne({ transactionId });
         if (existingTransaction) {
             return res.status(400).json({ message: 'এই ট্রানজেকশন আইডি আগেই ব্যবহার করা হয়েছে' });
         }
-        
-        // Create new payment record
+
         const newPayment = new Payment({
             name,
             email,
@@ -64,14 +65,29 @@ app.post('/api/submit-payment', async (req, res) => {
             transactionId,
             paymentMethod
         });
-        
+
         await newPayment.save();
-        
+
+        // ✅ Webhook এ POST রিকোয়েস্ট পাঠাও
+        try {
+            await axios.post(WEBHOOK_URL, {
+                name,
+                email,
+                mobile,
+                transactionId,
+                paymentMethod,
+                submittedAt: newPayment.submissionDate
+            });
+            console.log('✅ Webhook request sent successfully');
+        } catch (webhookError) {
+            console.error('❌ Webhook request failed:', webhookError.message);
+        }
+
         res.status(201).json({ 
             message: 'পেমেন্ট তথ্য সফলভাবে সংরক্ষণ করা হয়েছে',
             data: newPayment
         });
-        
+
     } catch (error) {
         console.error('Error saving payment:', error);
         res.status(500).json({ message: 'সার্ভারে সমস্যা হয়েছে' });
