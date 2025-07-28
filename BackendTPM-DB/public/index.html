@@ -186,6 +186,77 @@
         <div id="message" class="message"></div>
     </div>
 
+
+
+
+
+
+    <div class="status-check" style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+    <h3 style="text-align: center; color: #2c3e50;">পেমেন্ট স্ট্যাটাস চেক করুন</h3>
+    <div class="form-group">
+        <label for="checkTransaction">ট্রানজেকশন আইডি</label>
+        <input type="text" id="checkTransaction" placeholder="আপনার ট্রানজেকশন আইডি লিখুন">
+    </div>
+    <button id="checkStatusBtn" class="submit-btn" style="background-color: #3498db;">স্ট্যাটাস চেক করুন</button>
+    <div id="statusResult" style="margin-top: 20px; padding: 15px; border-radius: 5px; display: none;"></div>
+</div>
+
+<script>
+document.getElementById('checkStatusBtn').addEventListener('click', async function() {
+    const transactionId = document.getElementById('checkTransaction').value.trim();
+    if (!transactionId) {
+        alert('ট্রানজেকশন আইডি লিখুন');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/check-status/${transactionId}`);
+        const result = await response.json();
+        
+        const statusResult = document.getElementById('statusResult');
+        statusResult.style.display = 'block';
+        
+        if (response.ok) {
+            let statusText = '';
+            let statusClass = '';
+            
+            if (result.data.status === 'approved') {
+                statusText = `স্ট্যাটাস: অ্যাপ্রুভ্ড ✅<br>অ্যাপ্রুভ তারিখ: ${new Date(result.data.approvalDate).toLocaleString()}`;
+                statusClass = 'success';
+            } else if (result.data.status === 'pending') {
+                statusText = 'স্ট্যাটাস: পেন্ডিং ⏳<br>আপনার রিকোয়েষ্ট প্রসেসিং চলছে';
+                statusClass = 'pending';
+            } else {
+                statusText = `স্ট্যাটাস: রিজেক্টেড ❌<br>কারণ: ${result.data.comments || 'কোন কারণ দেওয়া হয়নি'}`;
+                statusClass = 'error';
+            }
+            
+            statusResult.innerHTML = statusText;
+            statusResult.className = `message ${statusClass}`;
+        } else {
+            statusResult.className = 'message error';
+            statusResult.textContent = result.message || 'স্ট্যাটাস চেক করতে সমস্যা হয়েছে';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        const statusResult = document.getElementById('statusResult');
+        statusResult.style.display = 'block';
+        statusResult.className = 'message error';
+        statusResult.textContent = 'নেটওয়ার্ক সমস্যা হয়েছে। পরে আবার চেষ্টা করুন।';
+    }
+});
+</script>
+
+<style>
+.message.pending {
+    background-color: #fff3cd;
+    color: #856404;
+}
+</style>
+
+
+
+
     <script>
         document.getElementById('paymentForm').addEventListener('submit', async function(e) {
             e.preventDefault();

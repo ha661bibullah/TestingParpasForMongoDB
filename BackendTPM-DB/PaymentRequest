@@ -1,0 +1,5 @@
+// PaymentRequest মডেলে
+PaymentRequestSchema.index({ transactionId: 1 }, { unique: true });
+PaymentRequestSchema.index({ email: 1 });
+PaymentRequestSchema.index({ status: 1 });
+PaymentRequestSchema.index({ submissionDate: -1 });
